@@ -1,0 +1,184 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Protocol
+
+from src.ingestion.contracts import DocumentRoutePlan, PageRouteDecision
+from src.ingestion.parser_contracts import (
+    CanonicalBlock,
+    CanonicalDocument,
+    CanonicalPage,
+    ParserFailure,
+    SourceCoordinates,
+)
+from src.ingestion.scaledown_client import ScaleDownError, ScaleDownExtractResult
+
+MAX_PAGE_RECOVERY_CONCURRENCY = 2
+_LOGGER = logging.getLogger(__name__)
+
+
+class _PagePdfExporter(Protocol):
+    async def extract_page_pdf(
+        self, source: Path, page_number: int
+    ) -> tuple[bytes, float, float]: ...
+
+
+class _PageTextExtractor(Protocol):
+    async def extract_document_text(
+        self, document: bytes, *, document_mime_type: str = "application/pdf"
+    ) -> ScaleDownExtractResult: ...
+
+
+async def recover_escalated_pages(
+    source: Path,
+    canonical: CanonicalDocument,
+    route_plan: DocumentRoutePlan,
+    *,
+    page_exporter: _PagePdfExporter,
+    text_extractor: _PageTextExtractor,
+    concurrency_semaphore: asyncio.Semaphore | None = None,
+) -> CanonicalDocument:
+    """Recover ESCALATE pages and failed local OCR pages using Extract.
+
+    The PDF page is isolated by the parser worker before it is sent to ScaleDown.
+    Extract's raw OCR output is kept as a single canonical text block with
+    page-level geometry; it does not provide word-level bounding boxes.
+    """
+    if canonical.page_count != route_plan.page_count:
+        raise ValueError("Canonical document and route plan page counts differ")
+
+    semaphore = (
+        concurrency_semaphore
+        if concurrency_semaphore is not None
+        else asyncio.Semaphore(MAX_PAGE_RECOVERY_CONCURRENCY)
+    )
+
+    async def recover_page(
+        page: CanonicalPage, decision: PageRouteDecision
+    ) -> CanonicalPage:
+        has_text = any(
+            block.block_type in {"TEXT", "TABLE"} and block.text.strip()
+            for block in page.blocks
+        )
+        should_recover = decision.route in {"ESCALATE", "OCR", "LAYOUT_OCR"} and (
+            page.status in {"FAILED", "BLANK", "VECTOR_ONLY"} or not has_text
+        )
+        if not should_recover:
+            return page
+
+        async with semaphore:
+            page_pdf, width, height = await page_exporter.extract_page_pdf(
+                source, page.page_number
+            )
+            try:
+                extracted = await text_extractor.extract_document_text(
+                    page_pdf,
+                    document_mime_type="application/pdf",
+                )
+            except ScaleDownError as exc:
+                _LOGGER.error(
+                    "ScaleDown page recovery failed",
+                    extra={
+                        "scaledown_page_number": page.page_number,
+                        "scaledown_exception_type": type(exc).__name__,
+                        "scaledown_http_status": exc.http_status,
+                        "scaledown_request_id": exc.request_id,
+                        "scaledown_error_message": str(exc),
+                    },
+                )
+                raise
+
+        prior_failure = page.failure or ParserFailure(
+            parser=decision.route,
+            code="LOCAL_OCR_NO_TEXT",
+            message="The local route produced no usable text.",
+        )
+        if not extracted.ocr_text.strip():
+            no_text_warning = ParserFailure(
+                parser="SCALEDOWN_EXTRACT",
+                code="FALLBACK_NO_TEXT",
+                message=(
+                    f"ScaleDown Extract ({extracted.model_id}) found no text; "
+                    "the page was excluded from text chunking."
+                ),
+            )
+            if any(
+                block.block_type == "IMAGE" and not block.text.strip()
+                for block in page.blocks
+            ):
+                return page.model_copy(
+                    update={
+                        "warnings": page.warnings + (prior_failure, no_text_warning)
+                    }
+                )
+            return CanonicalPage(
+                page_number=page.page_number,
+                parser="SCALEDOWN_EXTRACT",
+                status="PARSED",
+                blocks=(
+                    CanonicalBlock(
+                        page_number=page.page_number,
+                        text="",
+                        block_type="IMAGE",
+                        reading_order=0,
+                        source_coordinates=SourceCoordinates(
+                            x0=0.0,
+                            y0=0.0,
+                            x1=width,
+                            y1=height,
+                            unit="PDF_POINT",
+                            origin="TOP_LEFT",
+                        ),
+                    ),
+                ),
+                warnings=page.warnings + (prior_failure, no_text_warning),
+            )
+
+        fallback_warning = ParserFailure(
+            parser="SCALEDOWN_EXTRACT",
+            code="FALLBACK_TEXT_RECOVERED",
+            message=(
+                f"Page text was recovered with {extracted.model_id}"
+                f" (request {extracted.request_id or 'unavailable'}); geometry is "
+                "page-level and does not identify individual word positions."
+            ),
+        )
+        return CanonicalPage(
+            page_number=page.page_number,
+            parser="SCALEDOWN_EXTRACT",
+            status="PARSED",
+            blocks=(
+                CanonicalBlock(
+                    page_number=page.page_number,
+                    text=extracted.ocr_text,
+                    block_type="TEXT",
+                    reading_order=0,
+                    source_coordinates=SourceCoordinates(
+                        x0=0.0,
+                        y0=0.0,
+                        x1=width,
+                        y1=height,
+                        unit="PDF_POINT",
+                        origin="TOP_LEFT",
+                    ),
+                ),
+            ),
+            warnings=page.warnings + (prior_failure, fallback_warning),
+        )
+
+    tasks = [
+        asyncio.create_task(recover_page(page, decision))
+        for page, decision in zip(canonical.pages, route_plan.decisions, strict=True)
+    ]
+    try:
+        recovered_pages = await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+
+    return canonical.model_copy(update={"pages": tuple(recovered_pages)})

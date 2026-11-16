@@ -37,12 +37,26 @@
       </div>
     </div>
 
-    <!-- Theme Switcher -->
-    <button onclick="toggleTheme()" class="glass-pill-btn theme-toggle-btn" title="Toggle Light / Dark mode">
-      <span class="theme-icon-orb">☼</span>
-      <span class="theme-label-slot">Light</span>
-      <span style="font-size: 10px; opacity: 0.6;">▾</span>
-    </button>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <!-- Connection Status Pill -->
+      <button onclick="openSettingsModal('api')" id="initialApiStatusPill" class="glass-pill-btn api-status-pill" title="Click to view API & Neo4j Settings">
+        <span class="status-indicator-dot dot-live" id="initialApiStatusDot"></span>
+        <span id="initialApiStatusText">API: Connected</span>
+      </button>
+
+      <!-- Settings Button -->
+      <button onclick="openSettingsModal()" class="glass-pill-btn" title="Open System & Neo4j Settings">
+        <span>⚙️</span>
+        <span>Settings</span>
+      </button>
+
+      <!-- Theme Switcher -->
+      <button onclick="toggleTheme()" class="glass-pill-btn theme-toggle-btn" title="Toggle Light / Dark mode">
+        <span class="theme-icon-orb">☼</span>
+        <span class="theme-label-slot">Light</span>
+        <span style="font-size: 10px; opacity: 0.6;">▾</span>
+      </button>
+    </div>
   </header>
 
   <!-- Centered Ingestion Hero & Dropzone -->
@@ -111,14 +125,14 @@
       <!-- Processing Progress Overlay -->
       <div id="initialProcessingScan" style="display: none; flex-direction: column; gap: 14px; margin-top: 24px; padding: 18px; border-radius: 16px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(129, 140, 248, 0.3);">
         <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px;">
-          <span style="font-weight: 700; color: var(--text-main);">Extracting Clauses &amp; Constructing Graph...</span>
+          <span style="font-weight: 700; color: var(--text-main);" id="initialProcTitle">Extracting Clauses &amp; Constructing Graph...</span>
           <span id="initialProcNum" style="font-family: var(--font-mono); color: #818cf8; font-weight: 800;">30%</span>
         </div>
         <div style="height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden;">
-          <div id="initialProcBar" style="height: 100%; width: 30%; border-radius: 6px; background: linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4); transition: width 0.2s ease;"></div>
+          <div id="initialProcBar" style="height: 100%; width: 30%; border-radius: 6px; background: linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4); transition: width 0.25s ease;"></div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted);">
-          <span>Evaluating entity dependencies &amp; liabilities...</span>
+          <span id="initialProcSub">Evaluating entity dependencies &amp; liabilities...</span>
           <button onclick="finishProcessingAndEnterDashboard()" style="background: none; border: none; color: #818cf8; cursor: pointer; text-decoration: underline; font-weight: 600;">Skip to Graph →</button>
         </div>
       </div>
@@ -198,10 +212,15 @@
       </div>
 
       <div class="top-controls-group">
-        <div class="status-pill-ready">
-          <span class="status-indicator-dot"></span>
-          <span>Graph Ready</span>
-        </div>
+        <button onclick="openSettingsModal('api')" id="dashboardApiStatusPill" class="glass-pill-btn api-status-pill" title="Click to view API & Neo4j Settings">
+          <span class="status-indicator-dot dot-live" id="dashboardApiStatusDot"></span>
+          <span id="dashboardApiStatusText">API: Connected</span>
+        </button>
+
+        <button onclick="openSettingsModal()" class="glass-pill-btn" title="Configure Endpoints & Neo4j Pattern">
+          <span>⚙️</span>
+          <span>Settings</span>
+        </button>
 
         <button onclick="toggleTheme()" class="glass-pill-btn theme-toggle-btn" title="Toggle Light / Dark mode">
           <span class="theme-icon-orb">☼</span>
@@ -384,37 +403,54 @@
             </div>
           </div>
 
-          <div class="qa-prompt-chips-row">
-            <button onclick="setQuestionText('What happens if either party terminates?')" class="prompt-chip">
-              ⚡ Termination liabilities (Section 8.2)
+          <!-- Controls: Clear and Expand right beside each other (NOT greyed out) -->
+          <div class="chat-top-actions-group">
+            <button onclick="clearChatMessages()" id="chatClearBtn" class="chat-clear-btn" title="Clear conversation thread">
+              <span>🗑️</span>
+              <span>Clear</span>
             </button>
-            <button onclick="setQuestionText('What data privacy and encryption standards apply?')" class="prompt-chip">
-              🔒 Data privacy &amp; encryption (Section 11.2)
-            </button>
-            <button onclick="setQuestionText('Why is the IP indemnity dangerous?')" class="prompt-chip">
-              ⚖️ IP indemnity super-caps (Section 14.3)
-            </button>
-            <button onclick="setQuestionText('Which court has exclusive jurisdiction?')" class="prompt-chip">
-              🏛️ Delaware jurisdiction (Section 16.2)
+            <button onclick="toggleChatExpanded()" id="chatExpandBtn" class="chat-expand-btn" title="Toggle expanded full-height chat">
+              <span id="chatExpandIcon">⤢</span>
+              <span id="chatExpandLabel">Expand</span>
             </button>
           </div>
         </div>
 
-        <div class="qa-ai-bubble-card">
-          <div class="ai-avatar-square">AI</div>
-          <div class="ai-bubble-text" id="aiMessageFeed">
-            The document graph has been indexed with <strong>34 legal nodes</strong> and <strong>56 relational edges</strong>. Enter any question or select a prompt chip above to interrogate cross-clause relationships with instant ground-truth citations.
-          </div>
-          <button class="send-plane-circle" onclick="submitCurrentQuestion()" title="Submit Query">
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
+        <!-- Prompt suggestion chips row -->
+        <div class="qa-prompt-chips-row" style="margin-top: 4px;">
+          <button onclick="setQuestionText('What happens if either party terminates?')" class="prompt-chip">
+            ⚡ Termination liabilities (Section 8.2)
           </button>
+          <button onclick="setQuestionText('What data privacy and encryption standards apply?')" class="prompt-chip">
+            🔒 Data privacy &amp; encryption (Section 11.2)
+          </button>
+          <button onclick="setQuestionText('Why is the IP indemnity dangerous?')" class="prompt-chip">
+            ⚖️ IP indemnity super-caps (Section 14.3)
+          </button>
+          <button onclick="setQuestionText('Which court has exclusive jurisdiction?')" class="prompt-chip">
+            🏛️ Delaware jurisdiction (Section 16.2)
+          </button>
+        </div>
+
+        <div class="qa-ai-bubble-card" style="padding: 14px 16px; flex-direction: column; align-items: stretch; position: relative;">
+          <div id="aiMessageFeed" class="chat-messages-container">
+            <div class="chat-msg-row ai-msg-row">
+              <div class="ai-avatar-square-sm">AI</div>
+              <div class="chat-ai-bubble">
+                <div class="chat-ai-body">
+                  The document graph has been indexed with <strong>34 legal nodes</strong> and <strong>56 relational edges</strong>. Ask any question or click a prompt chip above to interrogate cross-clause relationships with instant ground-truth citations.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <form onsubmit="handleFormSubmit(event)" class="qa-bottom-input-wrap">
           <span class="input-lightbulb-icon">💡</span>
           <input type="text" id="userQuestionInput" class="qa-text-input-field" placeholder="Ask a question about the document or its graph relationships...">
+          <button type="submit" class="qa-inline-send-btn" title="Submit Question">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
         </form>
       </div>
 
@@ -435,19 +471,19 @@
         </div>
 
         <!-- At-A-Glance Status Strip -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-radius: 12px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(129, 140, 248, 0.25); flex-wrap: wrap; gap: 12px;">
-          <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px;">
+        <div id="atAGlanceStrip" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-radius: 12px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(129, 140, 248, 0.25); flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px;" id="atAGlanceDetails">
             <span><strong>Parties:</strong> Apex Corp (Customer) &amp; CloudVendor Inc (Provider)</span>
             <span style="color: var(--text-muted);">&bull;</span>
             <span><strong>Jurisdiction:</strong> Delaware Courts</span>
             <span style="color: var(--text-muted);">&bull;</span>
             <span><strong>General Liability:</strong> Capped at 2&times; Fees</span>
           </div>
-          <span class="plain-badge-crit">⚠️ 1 Critical Risk to Amend</span>
+          <span class="plain-badge-crit" id="atAGlanceBadge">⚠️ 1 Critical Risk to Amend</span>
         </div>
 
         <!-- 4 Core Synthesis Cards -->
-        <div class="summary-matrix-grid">
+        <div class="summary-matrix-grid" id="summaryCardsGrid">
           
           <!-- Card 1: Data Security -->
           <div class="plain-card">
@@ -538,13 +574,14 @@
               Clear explanations of the 3 legal exposure points and how to fix them before signing.
             </p>
           </div>
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px;" id="riskHeaderBadges">
             <span class="plain-badge-crit">1 Critical</span>
             <span class="plain-badge-warn">1 Moderate</span>
             <span class="plain-badge-safe">1 Advisory</span>
           </div>
         </div>
 
+        <div id="riskDossiersList" style="display: flex; flex-direction: column; gap: 16px;">
         <!-- Risk Dossier 1: Critical IP Indemnity -->
         <div class="risk-dossier-card crit">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -652,12 +689,197 @@
             </button>
           </div>
         </div>
+        </div>
 
       </div>
 
     </div>
 </div>
 
+</div>
+
+<!-- ================================================================
+     SETTINGS & CONFIGURATION MODAL (Apple Glassmorphism)
+================================================================ -->
+<div id="settingsModal" class="settings-modal-overlay" style="display: none;" onclick="handleSettingsBackdropClick(event)">
+  <div class="settings-modal-card" onclick="event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="settings-modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 22px;">⚙️</span>
+        <div>
+          <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text-main);">System & API Settings</h3>
+          <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted);">Configure Live Endpoints, Neo4j Graph Rendering, and Chat RAG Engine</p>
+        </div>
+      </div>
+      <button class="settings-close-btn" onclick="closeSettingsModal()" title="Close Settings">✕</button>
+    </div>
+
+    <!-- Modal Tabs -->
+    <div class="settings-tabs-bar">
+      <button class="settings-tab-btn active" data-tab="api" onclick="switchSettingsTab('api')">🔌 API & Endpoints</button>
+      <button class="settings-tab-btn" data-tab="neo4j" onclick="switchSettingsTab('neo4j')">🕸️ Neo4j Graph</button>
+      <button class="settings-tab-btn" data-tab="physics" onclick="switchSettingsTab('physics')">⚡ Physics Engine</button>
+      <button class="settings-tab-btn" data-tab="chat" onclick="switchSettingsTab('chat')">💬 Chat & RAG</button>
+    </div>
+
+    <!-- Tab 1: API Configuration -->
+    <div id="tabContentApi" class="settings-tab-content active">
+      <div class="settings-row">
+        <label class="settings-label">Backend API Base URL</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="settingApiUrl" class="settings-input" value="http://localhost:3000" placeholder="e.g. http://localhost:3000 or /api">
+          <button class="glass-pill-btn" onclick="testApiConnection(true)" style="padding: 0 16px; font-size: 12px; white-space: nowrap;">
+            ⚡ Ping Test
+          </button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          Direct connection to FastAPI server (`/api/query`, `/api/graph`, `/api/neo4j/graph`, `/api/upload`).
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label">Execution Mode & Fallback Strategy</label>
+        <select id="settingApiMode" class="settings-select" onchange="updateApiModeUI()">
+          <option value="auto">🔄 Hybrid Auto-Detect (Live API with Autonomous Fallback)</option>
+          <option value="live">🟢 Live API Enforced (Requires reachable backend)</option>
+          <option value="standalone">🟡 Standalone Offline Mode (In-browser RAG & Graph)</option>
+        </select>
+        <div id="apiStatusDetails" style="font-size: 11px; color: #38bdf8; margin-top: 6px; padding: 6px 10px; background: rgba(56, 189, 248, 0.08); border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.2);">
+          Status: Checking backend connection...
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label">API Authorization Token (Optional)</label>
+        <input type="password" id="settingApiToken" class="settings-input" placeholder="Bearer eyJhbGciOiJIUzI1NiIs..." autocomplete="off">
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          Optional header sent as <code>Authorization: Bearer &lt;token&gt;</code> for enterprise auth gateways.
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Neo4j Graph Settings -->
+    <div id="tabContentNeo4j" class="settings-tab-content">
+      <div class="settings-row">
+        <label class="settings-label">Graph Database Format Adapter</label>
+        <select id="settingGraphSource" class="settings-select" onchange="reloadGraphWithCurrentSettings()">
+          <option value="neo4j">🕸️ Native Neo4j Graph Format (/api/neo4j/graph)</option>
+          <option value="d3">📊 Standard Force-Directed Nodes (/api/graph)</option>
+          <option value="hybrid">⚡ Auto-Detect Schema (Normalizes Neo4j & Custom)</option>
+        </select>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          Seamlessly adapts Neo4j <code>labels</code>, <code>properties</code>, <code>relationships</code> (startNode/endNode/type) into the interactive canvas.
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label">Live Cypher Playground</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="settingCypherQuery" class="settings-input font-mono" value="MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 25" style="font-size: 11.5px;">
+          <button class="glass-pill-btn" onclick="executeCypherInSettings()" style="padding: 0 16px; font-size: 12px; white-space: nowrap; background: rgba(99, 102, 241, 0.25);">
+            ▶ Run Cypher
+          </button>
+        </div>
+        <div id="cypherResultSummary" style="font-size: 11px; color: var(--text-muted); margin-top: 6px; font-family: var(--font-mono);">
+          Ready to query Neo4j endpoint (/api/neo4j/cypher).
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label">Ontology Label Color Map</label>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; margin-top: 6px; font-size: 11px;">
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>ORGANIZATION</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#a855f7;display:inline-block;"></span>APPLICATION</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#6366f1;display:inline-block;"></span>POLICY</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span>OBLIGATION</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;display:inline-block;"></span>CONTROL</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>RISK</div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;"></span>EVIDENCE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Physics Engine -->
+    <div id="tabContentPhysics" class="settings-tab-content">
+      <div class="settings-row">
+        <div style="display: flex; justify-content: space-between;">
+          <label class="settings-label">Node Charge (Repulsion)</label>
+          <span id="chargeValDisplay" style="font-family: var(--font-mono); font-size: 11px; color: #a5b4fc;">-240</span>
+        </div>
+        <input type="range" id="settingCharge" class="settings-slider" min="-500" max="-50" value="-240" oninput="updatePhysicsFromSlider()">
+      </div>
+
+      <div class="settings-row">
+        <div style="display: flex; justify-content: space-between;">
+          <label class="settings-label">Link Spring Distance</label>
+          <span id="distanceValDisplay" style="font-family: var(--font-mono); font-size: 11px; color: #a5b4fc;">80px</span>
+        </div>
+        <input type="range" id="settingDistance" class="settings-slider" min="30" max="220" value="80" oninput="updatePhysicsFromSlider()">
+      </div>
+
+      <div class="settings-row">
+        <div style="display: flex; justify-content: space-between;">
+          <label class="settings-label">Node Collision Padding</label>
+          <span id="collisionValDisplay" style="font-family: var(--font-mono); font-size: 11px; color: #a5b4fc;">18px</span>
+        </div>
+        <input type="range" id="settingCollision" class="settings-slider" min="8" max="40" value="18" oninput="updatePhysicsFromSlider()">
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button class="glass-pill-btn" onclick="resetPhysicsDefaults()" style="padding: 6px 14px; font-size: 11.5px;">
+          Reset Physics Defaults
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 4: Chat & RAG Settings -->
+    <div id="tabContentChat" class="settings-tab-content">
+      <div class="settings-row">
+        <div style="display: flex; justify-content: space-between;">
+          <label class="settings-label">RAG Minimum Confidence Threshold</label>
+          <span id="ragConfDisplay" style="font-family: var(--font-mono); font-size: 11px; color: #34d399;">70%</span>
+        </div>
+        <input type="range" id="settingRagConf" class="settings-slider" min="40" max="95" value="70" oninput="document.getElementById('ragConfDisplay').textContent = this.value + '%'">
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          Queries below this threshold trigger semantic warning badges and suggest deeper analysis.
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label class="settings-label">Chat Window Default Height</label>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <button class="glass-pill-btn" onclick="setChatHeight(380)" style="padding: 5px 12px; font-size: 11.5px;">Standard (380px)</button>
+          <button class="glass-pill-btn" onclick="setChatHeight(520)" style="padding: 5px 12px; font-size: 11.5px;">Medium (520px)</button>
+          <button class="glass-pill-btn" onclick="setChatHeight(680)" style="padding: 5px 12px; font-size: 11.5px;">Large (680px)</button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+          Tip: You can also drag the bottom resize handle directly or click ⤢ to expand to maximum height!
+        </div>
+      </div>
+
+      <div class="settings-row" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <label class="settings-label">Conversation Management</label>
+        <div style="display: flex; gap: 8px; margin-top: 6px;">
+          <button class="glass-pill-btn" onclick="clearChatMessages()" style="padding: 5px 12px; font-size: 11.5px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+            🗑️ Clear Chat History
+          </button>
+          <button class="glass-pill-btn" onclick="exportChatConversation()" style="padding: 5px 12px; font-size: 11.5px;">
+            📥 Export Transcript (JSON)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="settings-modal-footer">
+      <div style="font-size: 11px; color: var(--text-muted);">Changes persist to localStorage.</div>
+      <div style="display: flex; gap: 8px;">
+        <button class="glass-pill-btn" onclick="closeSettingsModal()" style="padding: 7px 16px; font-size: 12px;">Cancel</button>
+        <button class="glass-pill-btn" onclick="saveSettingsAndApply()" style="padding: 7px 20px; font-size: 12px; background: var(--accent-gradient); color: #fff; font-weight: 700; border: none;">Save & Apply</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ================================================================
